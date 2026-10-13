@@ -29,9 +29,13 @@ jobs:
             git apply ./patches/* --allow-empty -v --whitespace=fix || true
           fi
 
-      - name: Build Trio App
+      - name: Install Dependencies
+        run: bundle install
+
+      - name: Build Trio Workspace
         run: |
           xcodebuild build \
+            -workspace Trio.xcworkspace \
             -scheme Trio \
             -configuration Release \
             -destination "generic/platform=iOS" \
