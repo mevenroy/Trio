@@ -23,6 +23,12 @@ jobs:
           submodules: recursive
           ref: ${{ env.TARGET_BRANCH }}
 
+      - name: Patch Bundle Identifier
+        run: |
+          # Remplace le bundle id officiel par un identifiant personnel dans tous les fichiers de configuration
+          find . -type f \( -name "*.xcconfig" -o -name "project.pbxproj" \) -exec sed -i '' 's/org\.nightscout\.Trio/org.mevenroy.trio/g' {} +
+          find . -type f \( -name "*.xcconfig" -o -name "project.pbxproj" \) -exec sed -i '' 's/org\.nightscout\.iAPS/org.mevenroy.trio/g' {} +
+
       - name: Customize Trio
         run: |
           if ls ./patches/* 1> /dev/null 2>&1; then
@@ -40,7 +46,6 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -derivedDataPath build_output \
-            PRODUCT_BUNDLE_IDENTIFIER="org.mevenroy.trio" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
