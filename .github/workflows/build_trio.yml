@@ -40,6 +40,7 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -derivedDataPath build_output \
+            PRODUCT_BUNDLE_IDENTIFIER="org.mevenroy.trio" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
