@@ -23,11 +23,6 @@ jobs:
           submodules: recursive
           ref: ${{ env.TARGET_BRANCH }}
 
-      - name: Patch Bundle Identifier in Source
-        run: |
-          find . -type f \( -name "*.xcconfig" -o -name "project.pbxproj" \) -exec sed -i '' 's/org\.nightscout\.Trio/org.mevenroy.trio/g' {} +
-          find . -type f \( -name "*.xcconfig" -o -name "project.pbxproj" \) -exec sed -i '' 's/org\.nightscout\.iAPS/org.mevenroy.trio/g' {} +
-
       - name: Customize Trio
         run: |
           if ls ./patches/* 1> /dev/null 2>&1; then
@@ -50,7 +45,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Package IPA for AltStore
+      - name: Package IPA for AltStore (With Watch & Widgets)
         run: |
           mkdir -p artifacts/Payload
           APP_PATH=$(find build_output/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
@@ -58,16 +53,56 @@ jobs:
             echo "Erreur : application .app introuvable"
             exit 1
           fi
-          echo "Application trouvée : $APP_PATH"
-          cp -R "$APP_PATH" artifacts/Payload/
+          cp -R "$APP_PATH" artifacts/Payload/Trio.app
 
-          # Remplacement forcé du CFBundleIdentifier directement dans le binaire compilé
-          PLIST="artifacts/Payload/$(basename "$APP_PATH")/Info.plist"
-          if [ -f "$PLIST" ]; then
-            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier org.mevenroy.trio" "$PLIST" || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string org.mevenroy.trio" "$PLIST"
-            echo "Bundle Identifier forcé à : $(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PLIST")"
+          # 1. Nettoyer les anciennes signatures résiduelles
+          find artifacts/Payload/Trio.app -name "_CodeSignature" -exec rm -rf {} + || true
+          find artifacts/Payload/Trio.app -name "embedded.mobileprovision" -delete || true
+
+          # 2. Définir le Bundle ID racine unique
+          MAIN_ID="com.melvyneven30000.trio"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $MAIN_ID" "artifacts/Payload/Trio.app/Info.plist"
+
+          # 3. Aligner les Widgets / PlugIns de l'iPhone
+          P_COUNT=1
+          if [ -d "artifacts/Payload/Trio.app/PlugIns" ]; then
+            for plugin in artifacts/Payload/Trio.app/PlugIns/*.appex; do
+              if [ -f "$plugin/Info.plist" ]; then
+                /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${MAIN_ID}.plugin${P_COUNT}" "$plugin/Info.plist"
+                P_COUNT=$((P_COUNT + 1))
+              fi
+            done
           fi
+
+          # 4. Aligner l'application Apple Watch et ses extensions
+          if [ -d "artifacts/Payload/Trio.app/Watch" ]; then
+            for watch_app in artifacts/Payload/Trio.app/Watch/*.app; do
+              if [ -f "$watch_app/Info.plist" ]; then
+                WATCH_ID="${MAIN_ID}.watchkitapp"
+                /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $WATCH_ID" "$watch_app/Info.plist"
+                /usr/libexec/PlistBuddy -c "Set :WKCompanionAppBundleIdentifier $MAIN_ID" "$watch_app/Info.plist" || true
+                
+                # Aligner les extensions internes de la Watch
+                W_COUNT=1
+                if [ -d "$watch_app/PlugIns" ]; then
+                  for watch_ext in "$watch_app/PlugIns"/*.appex; do
+                    if [ -f "$watch_ext/Info.plist" ]; then
+                      /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${WATCH_ID}.ext${W_COUNT}" "$watch_ext/Info.plist"
+                      /usr/libexec/PlistBuddy -c "Set :NSExtension:NSExtensionAttributes:WKAppBundleIdentifier $WATCH_ID" "$watch_ext/Info.plist" || true
+                      W_COUNT=$((W_COUNT + 1))
+                    fi
+                  done
+                fi
+              fi
+            done
+          fi
+
+          # 5. Aligner tous les Frameworks (iPhone + Watch) pour éviter tout conflit 3010
+          F_COUNT=1
+          find artifacts/Payload/Trio.app -path "*.framework/Info.plist" | while read fw_plist; do
+            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${MAIN_ID}.fw${F_COUNT}" "$fw_plist" || true
+            F_COUNT=$((F_COUNT + 1))
+          done
 
           cd artifacts
           zip -qry Trio.ipa Payload
