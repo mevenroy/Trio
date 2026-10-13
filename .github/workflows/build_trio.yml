@@ -23,9 +23,8 @@ jobs:
           submodules: recursive
           ref: ${{ env.TARGET_BRANCH }}
 
-      - name: Patch Bundle Identifier
+      - name: Patch Bundle Identifier in Source
         run: |
-          # Remplace le bundle id officiel par un identifiant personnel dans tous les fichiers de configuration
           find . -type f \( -name "*.xcconfig" -o -name "project.pbxproj" \) -exec sed -i '' 's/org\.nightscout\.Trio/org.mevenroy.trio/g' {} +
           find . -type f \( -name "*.xcconfig" -o -name "project.pbxproj" \) -exec sed -i '' 's/org\.nightscout\.iAPS/org.mevenroy.trio/g' {} +
 
@@ -61,6 +60,15 @@ jobs:
           fi
           echo "Application trouvée : $APP_PATH"
           cp -R "$APP_PATH" artifacts/Payload/
+
+          # Remplacement forcé du CFBundleIdentifier directement dans le binaire compilé
+          PLIST="artifacts/Payload/$(basename "$APP_PATH")/Info.plist"
+          if [ -f "$PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier org.mevenroy.trio" "$PLIST" || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string org.mevenroy.trio" "$PLIST"
+            echo "Bundle Identifier forcé à : $(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PLIST")"
+          fi
+
           cd artifacts
           zip -qry Trio.ipa Payload
           rm -rf Payload
