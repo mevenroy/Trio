@@ -501,9 +501,6 @@ extension Treatments {
                         state.carbs = val
                     }
                     Task { @MainActor in
-                        if state.carbs > 0 {
-                            await state.updateForecasts()
-                        }
                         state.insulinCalculated = await state.calculateInsulin()
                     }
 
@@ -512,13 +509,12 @@ extension Treatments {
                     }
                 }
             }
-            .onReceive(Foundation.NotificationCenter.default.publisher(for: Foundation.Notification.Name("updateTreatmentCarbs"))) { notif in
-                if let val = notif.object as? Decimal {
+            .onOpenURL { url in
+                let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                if comps?.host == "treatment",
+                   let carbsStr = comps?.queryItems?.first(where: { $0.name == "carbs" })?.value,
+                   let val = Decimal(string: carbsStr), val > 0 {
                     state.carbs = val
-                    Task { @MainActor in
-                        await state.updateForecasts()
-                        state.insulinCalculated = await state.calculateInsulin()
-                    }
                 }
             }
             .onDisappear {

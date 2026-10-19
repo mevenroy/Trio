@@ -538,9 +538,6 @@ extension Notification.Name {
         case "treatment":
             if let carbsStr = components?.queryItems?.first(where: { $0.name == "carbs" })?.value {
                 UserDefaults.standard.set(carbsStr, forKey: "pendingTreatmentCarbs")
-                if let carbsVal = Decimal(string: carbsStr) {
-                    NotificationCenter.default.post(name: Notification.Name("updateTreatmentCarbs"), object: carbsVal)
-                }
             }
             resolver.resolve(Router.self)?.mainModalScreen.send(.treatmentView)
         default: break
