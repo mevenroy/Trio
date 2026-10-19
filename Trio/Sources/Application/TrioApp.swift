@@ -389,6 +389,11 @@ extension Notification.Name {
             .onChange(of: showLoadingView) { _, isLoading in
                 if !isLoading {
                     presentDevelopmentBranchWarningIfNeeded()
+                    if UserDefaults.standard.string(forKey: "pendingTreatmentCarbs") != nil {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            resolver.resolve(Router.self)?.mainModalScreen.send(.treatmentView)
+                        }
+                    }
                 }
             }
             // A first-time user is still in onboarding when the loading screen goes away, so the
@@ -399,6 +404,7 @@ extension Notification.Name {
                 }
             }
             .developmentBranchWarning(developmentBranchAlerter)
+            .onOpenURL(perform: handleURL)
         }
         .onChange(of: scenePhase) { _, newScenePhase in
             debug(.default, "APPLICATION PHASE: \(newScenePhase)")
@@ -531,16 +537,19 @@ extension Notification.Name {
 
     private func handleURL(_ url: URL) {
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let hostOrPath = components?.host ?? url.host ?? url.path
 
-        switch components?.host {
-        case "device-select-resp":
+        if hostOrPath == "device-select-resp" {
             resolver.resolve(NotificationCenter.self)!.post(name: .openFromGarminConnect, object: url)
-        case "treatment":
+        } else if hostOrPath == "treatment" || hostOrPath == "/treatment" || url.absoluteString.contains("treatment") {
             if let carbsStr = components?.queryItems?.first(where: { $0.name == "carbs" })?.value {
                 UserDefaults.standard.set(carbsStr, forKey: "pendingTreatmentCarbs")
             }
-            resolver.resolve(Router.self)?.mainModalScreen.send(.treatmentView)
-        default: break
+            if !showLoadingView {
+                DispatchQueue.main.async {
+                    resolver.resolve(Router.self)?.mainModalScreen.send(.treatmentView)
+                }
+            }
         }
     }
 }

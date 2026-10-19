@@ -499,9 +499,11 @@ extension Treatments {
                        let val = Decimal(string: pending), val > 0 {
                         UserDefaults.standard.removeObject(forKey: "pendingTreatmentCarbs")
                         state.carbs = val
-                    }
-                    Task { @MainActor in
-                        state.insulinCalculated = await state.calculateInsulin()
+                        handleDebouncedInput()
+                    } else {
+                        Task { @MainActor in
+                            state.insulinCalculated = await state.calculateInsulin()
+                        }
                     }
 
                     if PropertyPersistentFlags.shared.hasSeenFatProteinOrderChange != true {
@@ -511,10 +513,12 @@ extension Treatments {
             }
             .onOpenURL { url in
                 let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                if comps?.host == "treatment",
+                let hostOrPath = comps?.host ?? url.host ?? url.path
+                if hostOrPath == "treatment" || hostOrPath == "/treatment" || url.absoluteString.contains("treatment"),
                    let carbsStr = comps?.queryItems?.first(where: { $0.name == "carbs" })?.value,
                    let val = Decimal(string: carbsStr), val > 0 {
                     state.carbs = val
+                    handleDebouncedInput()
                 }
             }
             .onDisappear {

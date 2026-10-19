@@ -2,6 +2,9 @@ name: 4. Build Trio
 run-name: Build Trio (${{ github.ref_name }})
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 env:
   TARGET_BRANCH: ${{ github.ref_name }}
@@ -38,6 +41,15 @@ jobs:
       - name: Install Dependencies
         run: bundle install
 
+      - name: Restore Xcode DerivedData Cache
+        uses: actions/cache@v4
+        with:
+          path: build_output
+          key: ${{ runner.os }}-trio-build-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-trio-build-${{ github.ref_name }}-
+            ${{ runner.os }}-trio-build-
+
       - name: Build Trio Workspace
         run: |
           xcodebuild build \
@@ -46,6 +58,9 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -derivedDataPath build_output \
+            -jobs $(sysctl -n hw.logicalcpu) \
+            ARCHS=arm64 \
+            DEBUG_INFORMATION_FORMAT=dwarf \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
