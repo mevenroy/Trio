@@ -495,12 +495,29 @@ extension Treatments {
             .onAppear {
                 configureView {
                     state.isActive = true
+                    if let pending = UserDefaults.standard.string(forKey: "pendingTreatmentCarbs"),
+                       let val = Decimal(string: pending), val > 0 {
+                        UserDefaults.standard.removeObject(forKey: "pendingTreatmentCarbs")
+                        state.carbs = val
+                    }
                     Task { @MainActor in
+                        if state.carbs > 0 {
+                            await state.updateForecasts()
+                        }
                         state.insulinCalculated = await state.calculateInsulin()
                     }
 
                     if PropertyPersistentFlags.shared.hasSeenFatProteinOrderChange != true {
                         showFatProteinOrderBanner = true
+                    }
+                }
+            }
+            .onReceive(Foundation.NotificationCenter.default.publisher(for: Foundation.Notification.Name("updateTreatmentCarbs"))) { notif in
+                if let val = notif.object as? Decimal {
+                    state.carbs = val
+                    Task { @MainActor in
+                        await state.updateForecasts()
+                        state.insulinCalculated = await state.calculateInsulin()
                     }
                 }
             }
